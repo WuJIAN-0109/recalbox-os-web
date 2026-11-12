@@ -421,6 +421,7 @@ main.js                 Electron main (app:// protocol with COOP/COEP + CSP, net
 www/                    the app (frontend + EmulatorJS data)
   index.html            UI: boot · system view · game view · player · control center · dialogs
   js/app.js             frontend logic (library DB, navigation, hotkeys, settings, BIOS manager, Fix-it dialogs)
+  js/i18n.js            UI language runtime + en/zh-CN dictionary (no build step)
   js/romfix.js          arcade romset rebuilder: CRC32 (+ combine), zip read/write, 7z via the local extractor, identify / plan / build
   css/                  theme + font
   img/                  logo.svg / banner.svg / icon-256.png + screenshots for this README
@@ -440,6 +441,30 @@ scripts/build-bios-db.js    regenerates www/data/bios-db.json from the RetroBIOS
 Where things are stored on your machine (all local): games, BIOS and box art in the app's
 IndexedDB (`recalbox-web`), save states in `EmulatorJS-states`, in-game saves (SRAM / memory cards)
 in the emulator's IDBFS, settings in `localStorage`.
+
+## 🌐 Interface language
+
+The frontend ships with **English** (source) and **Simplified Chinese** (`zh-CN`).
+
+- **Settings → Language**: `Auto (system)` / `English` / `中文（简体）`. The choice is stored with the
+  other settings (`rbw-settings`, plus `rbw-language` for the first paint) and applies immediately
+  (the window reloads so every screen is rebuilt in the new language).
+- The **in-game EmulatorJS menu** (save states, shaders, controls, cheat codes …) follows the same
+  setting; the translation files live in `www/data/localization/` (14 languages are already there
+  from EmulatorJS and can be selected by setting a matching language).
+- UI text is localised at render time by `www/js/i18n.js`: English is the key, a missing entry falls
+  back to English, so a half-finished translation never breaks the app. Static markup uses
+  `data-i18n` / `data-i18n-ph`; runtime-assembled strings (counts, “Controls for NES”, `◀ 3× ▶`)
+  are handled by rules in the same file.
+- **Adding a language**: add one dictionary object to `DICT` in `www/js/i18n.js` (keyed by the English
+  source strings, `{n}` placeholders supported) and, optionally, a `www/data/localization/<locale>.json`
+  for EmulatorJS. No build step, no dependency.
+- **Chinese font**: the UI font is the pixel font *Press Start 2P*, which has no CJK glyphs; the CSS
+  already falls back to the platform's Chinese UI font and tweaks sizes/letter-spacing under
+  `html[lang="zh-CN"]`. Dropping a Chinese pixel font in and naming it `PressStartCN` in
+  `www/css/app.css` is enough to switch the look.
+- Game **metadata** (titles, genres, bundled descriptions from `www/roms/library.json`) stays in the
+  language the games were published in.
 
 ## 📄 Licenses
 

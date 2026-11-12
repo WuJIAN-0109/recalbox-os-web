@@ -363,3 +363,18 @@ body[data-view="boot"] footer{display:none}
 .fixprog .spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line2);border-top-color:var(--orange);animation:fixspin .8s linear infinite;flex:none}
 @keyframes fixspin{to{transform:rotate(360deg)}}
 .verdict.ok{border-color:rgba(126,217,87,.55);box-shadow:inset 3px 0 0 var(--green)}
+
+/* ================= i18n ================= */
+.pl-hints em,.cc-foot em,.modal-foot em{font-style:normal}
+/* The Press Start 2P pixel font has no CJK glyphs: keep the pixel look for Latin and fall back to
+   the platform UI font for Chinese. Swap "PressStartCN" in below once a Chinese pixel font ships. */
+html[lang="zh-CN"]{--ui:"PressStartCN","PressStart","PingFang SC","Microsoft YaHei","Noto Sans SC","Hiragino Sans GB",sans-serif}
+html[lang="zh-CN"] .sec-title,html[lang="zh-CN"] .hb span,html[lang="zh-CN"] .pl-hints span,html[lang="zh-CN"] .cc-foot span,html[lang="zh-CN"] .modal-foot span{letter-spacing:0}
+html[lang="zh-CN"] .hb span{font-size:9px}
+html[lang="zh-CN"] .cc-foot,html[lang="zh-CN"] .modal-foot,html[lang="zh-CN"] .pl-hints{font-size:8px}
+html[lang="zh-CN"] .sec-title{letter-spacing:1px}
+html[lang="zh-CN"] .sec-title span.dim{color:var(--muted)}
+html[lang="zh-CN"] .mi-l{font-size:10px}
+html[lang="zh-CN"] .mi-s{font-size:12px;letter-spacing:0}
+html[lang="zh-CN"] .game .t{letter-spacing:0}
+

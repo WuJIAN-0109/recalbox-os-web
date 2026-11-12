@@ -34,7 +34,29 @@
   document.addEventListener("keydown",function(){ mouse.active=false; },true);
   function hoverOK(){ return mouse.active; }
   var toastTimer=null;
-  function toast(msg,ms){ var t=byId("toast"); t.innerHTML=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.classList.remove("show")},ms||3000); }
+  function toast(msg,ms){ var t=byId("toast"); t.innerHTML=msg; t.classList.add("show"); localizeUI(t); clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.classList.remove("show")},ms||3000); }
+
+  /* ---------- i18n glue ----------
+     The UI text is localised at the *render boundaries* (openModal / toast / list renders):
+     every English string produced by the code goes through I18N with the dictionary in
+     js/i18n.js. Unknown strings stay English, so a half-translated build never breaks. */
+  function T(s,vars){ return (window.I18N && s) ? (vars ? I18N.t(s,vars) : I18N.tr(s)) : s; }
+  function localizeUI(root){ try{ if(window.I18N) I18N.nodes(root||document.body); }catch(e){} }
+  function applyLanguage(reRender){
+    if(window.I18N) I18N.setLocale(settings.language||"auto");
+    var loc=window.I18N?I18N.locale:"en-US";
+    document.documentElement.setAttribute("lang",loc);
+    document.documentElement.setAttribute("data-locale",loc);
+    try{ localStorage.setItem("rbw-language",settings.language||"auto"); }catch(e){}
+    if(window.I18N) I18N.apply(document);
+    localizeUI(document.body);
+    updateFooter();
+    if(reRender){
+      if(view==="systems") renderSystems();
+      else if(view==="library") openLibrary(currentSys,true);
+      else if(view==="player") localizeUI(byId("player"));
+    }
+  }
 
   /* ---------- tiny navigation "click" sound (Web Audio, no assets) ---------- */
   var audioCtx=null;
@@ -105,6 +127,7 @@
     autoLoadState:false,      // "Auto Save/Load" like RetroBat
     autoSaveState:true,
     navSounds:true,
+    language:"auto",          // auto | en-US | zh-CN — see I18N in js/i18n.js
     bezel:false,
     theme:"carbon",           // carbon | recalbox | ocean
     hideEmptySystems:false,
@@ -316,6 +339,7 @@
     bundled.forEach(function(g){ fetch(g.url,{method:"HEAD"}).then(function(x){ var n=parseInt(x.headers.get("content-length")||"0",10); if(n){ g.size=n; } }).catch(function(){}); });
     var nCores=Object.keys(CORE_FILES).length, okCores=Object.keys(CORE_FILES).filter(function(c){ return CORE_FILES[c].every(function(f){ return !!CORES.files[f]; }); }).length;
     byId("bootLog").innerHTML="loading kernel ........ ok<br>mounting library ...... "+(ROMS.length)+" game"+(ROMS.length===1?"":"s")+(bundled.length?" · "+bundled.length+" free":"")+"<br>loading emulators ..... "+okCores+"/"+nCores+" cores"+(CORES.bytes?" · "+fmtBytes(CORES.bytes):"")+(okCores===nCores?" · offline ready":' · <span class="warn">'+(nCores-okCores)+" missing</span>");
+    localizeUI(byId("bootLog"));
     if(okCores<nCores) console.warn("Missing emulator cores:",CORES.missing.join(", "),"— run `npm run cores` to bundle them.");
     byId("boot").classList.add("ready");
     if(view==="systems") renderSystems();
@@ -335,6 +359,7 @@
     else if(view==="library") f.innerHTML=hint("↑↓←→","MOVE")+hint("ENTER / A","PLAY")+hint("SPACE / X","OPTIONS")+hint("I","INFO")+hint("F / Y","FILTER")+hint("ESC / B","BACK");
     else if(view==="player") f.innerHTML="";
     var c=byId("footCount"); c.textContent="SYSTEMS: "+SYSTEMS.length+" · GAMES: "+ROMS.length+(Object.keys(BIOS).length?" · BIOS: "+Object.keys(BIOS).length:"");
+    localizeUI(f); localizeUI(c);
   }
   function hint(k,l){ return '<span><i class="kbd">'+k+'</i>'+l+'</span>'; }
 
@@ -381,6 +406,7 @@
       g.appendChild(card);
     });
     byId("sysCount").textContent=ROMS.length+" GAME"+(ROMS.length===1?"":"S")+" · "+SYSTEMS.length+" SYSTEMS";
+    localizeUI(g); localizeUI(byId("sysCount"));
     updateFooter();
   }
   function focusSystem(i,scroll,silent){
@@ -393,6 +419,7 @@
     if(el&&scroll!==false) el.scrollIntoView({block:"nearest",behavior:"smooth"});
     var s=sysList[i];
     byId("sysInfo").innerHTML = s.collection ? '<b>'+esc(s.name.toUpperCase())+'</b>' : '<b>'+esc(s.name.toUpperCase())+'</b> · '+esc(s.maker||"")+' · '+(s.year||"")+' · core: <i>'+esc(coreLabel(s))+'</i>'+(coreInstalled(s)?'':' <span class="warn">NOT BUNDLED</span>')+(s.bios?' · <span class="'+(biosStatus(s).missingReq||biosStatus(s).waiting?'warn':'ok')+'">BIOS '+(biosStatus(s).missingReq?'MISSING':biosStatus(s).waiting?'NEEDED':'OK')+'</span>':'');
+    localizeUI(byId("sysInfo"));
   }
   function coreLabel(s){ var map={nes:"fceumm",snes:"snes9x",n64:"mupen64plus-next",gb:"gambatte",gba:"mgba",nds:"melonds",psx:"pcsx-rearmed",psp:"ppsspp",segaMD:"genesis-plus-gx",segaMS:"smsplus",segaGG:"genesis-plus-gx",segaCD:"genesis-plus-gx",segaSaturn:"yabause",atari2600:"stella2014",atari5200:"a5200",atari7800:"prosystem",lynx:"handy",jaguar:"virtualjaguar",pce:"mednafen-pce",ws:"mednafen-wswan",ngp:"mednafen-ngp",c64:"vice-x64sc",amiga:"puae",arcade:"fbneo",mame:"mame2003-plus",dos:"dosbox-pure"}; return map[s.id]||s.core; }
   function gridColumns(gridEl){
@@ -424,6 +451,7 @@
     currentSys=sysId;
     if(!keepFocus){ focus.lib=0; libFilter=""; byId("libSearch").value=""; }
     byId("libCrumb").innerHTML='<span class="crumb-sys" style="--c:'+sys.color+'">'+sys.icon+'</span><span>'+esc(sys.name.toUpperCase())+'</span>';
+    localizeUI(byId("libCrumb"));
     // side list of systems
     var cons=byId("libCons"); cons.innerHTML="";
     var side=visibleSystems();
@@ -436,6 +464,7 @@
       cons.appendChild(c);
     });
     var act=$("#libCons .lc.active"); if(act) act.scrollIntoView({block:"nearest"});
+    localizeUI(cons);
     // system header (BIOS status, core)
     var hb=byId("libSysBar");
     if(sys.collection){ hb.innerHTML=''; hb.style.display="none"; }
@@ -450,6 +479,7 @@
       var bb=byId("biosBtn"); if(bb) bb.addEventListener("click",function(){ openBios(sys); });
       var cbn=byId("coreBtn"); if(cbn) cbn.addEventListener("click",function(){ openCoreInfo(sys); });
       var cb=byId("ctlBtn"); if(cb) cb.addEventListener("click",function(){ showControls(sys); });
+      localizeUI(hb);
     }
     renderGames();
     setScreen("library");
@@ -496,7 +526,7 @@
         'NO GAMES YET FOR <b>'+esc(sys.name.toUpperCase())+'</b><br><small>DROP FILES ANYWHERE IN THIS WINDOW OR CLICK <b>ADD GAMES</b> · ACCEPTED: '+esc((sys.exts||[]).map(function(e){return "."+e;}).join(" "))+'</small>';
     } else emptyMsg.style.display="none";
     byId("libStats").innerHTML='<b>'+libList.length+'</b> GAME'+(libList.length===1?"":"S")+(libFilter?' · FILTER: <b>'+esc(libFilter)+'</b>':'')+' · SORT: <b>'+({name:"A-Z",recent:"LAST PLAYED",added:"DATE ADDED",played:"MOST PLAYED",system:"SYSTEM"})[libSort]+'</b>';
-    updateFooter();
+    localizeUI(g); localizeUI(byId("libStats")); localizeUI(emptyMsg); updateFooter();
   }
   function focusGame(i,scroll,silent){
     var max=libList.length; // add tile at index libList.length
@@ -516,6 +546,7 @@
         (m&&m.desc?'<div class="dd">'+esc(m.desc)+'</div>':'')+
         '<div class="dm">'+esc(gs.name)+' · '+esc(game.fileName)+' · '+fmtBytes(game.size)+' · PLAYED <b>'+(game.playCount||0)+'</b>× · TIME <b>'+fmtDur(game.playTime)+'</b> · LAST <b>'+fmtAgo(game.lastPlayed)+'</b>'+(game.fav?' · <span class="favtxt">'+ICON.heart+' FAVORITE</span>':'')+(m?' · <i class="kbd">I</i> INFO':'')+'</div>';
     } else d.innerHTML='<div class="dt">ADD GAMES</div><div class="dm">Pick one or more ROM files — you can also drop files anywhere in this window. Files are stored inside the app, so they stay in your library.</div>';
+    localizeUI(d);
   }
   function focusCons(i){
     var items=$$("#libCons .lc"); if(!items.length)return;
@@ -1283,7 +1314,7 @@
   }
   function openModal(opts){
     modalItems=(opts.items||[]).filter(function(it){ return !it.hide; }); modalFocus=0; modalOnClose=opts.onClose||null;
-    byId("modalTitle").textContent=opts.title||""; byId("modalSub").innerHTML=opts.sub||"";
+    byId("modalTitle").textContent=T(opts.title||""); byId("modalSub").innerHTML=opts.sub||"";
     var body=byId("modalBody"); body.innerHTML="";
     if(opts.html){ var h=document.createElement("div"); h.className="modal-html"; h.innerHTML=opts.html; body.appendChild(h); }
     modalItems.forEach(function(it,i){
@@ -1297,6 +1328,7 @@
       body.appendChild(el);
     });
     mouse.active=false;
+    localizeUI(modal);
     modal.classList.add("open");
     modalSetFocus(0,true);
   }
@@ -1396,6 +1428,7 @@
       {label:"Volume",icon:ICON.info,value:Math.round(settings.volume*100)+"%",cycle:function(d){ settings.volume=clamp(Math.round((settings.volume+d*0.1)*10)/10,0,1); saveSettings(); rebuild(); }},
       {label:"Gamepad HOTKEY button",sub:"Hold it with another button for shortcuts",icon:ICON.pad,value:lbl(HK,settings.hotkeyBtn),cycle:function(d){ settings.hotkeyBtn=cyc(HK,settings.hotkeyBtn,d); saveSettings(); rebuild(); }},
       {label:"Navigation sounds",icon:ICON.info,toggle:settings.navSounds,action:function(){ settings.navSounds=!settings.navSounds; saveSettings(); rebuild(); }},
+      {label:"Language",sub:"Interface language — the in-game EmulatorJS menu follows it on the next launch",icon:ICON.info,value:({auto:"Auto (system)","en-US":"English","zh-CN":"中文（简体）"})[settings.language]||"Auto (system)",cycle:function(d){ var order=["auto","en-US","zh-CN"]; var i=order.indexOf(settings.language); settings.language=order[(i+d+order.length)%order.length]; saveSettings(); try{ localStorage.setItem("rbw-language",settings.language); }catch(e){} location.reload(); }},
       {label:"Theme",icon:ICON.star,value:lbl(THEMES,settings.theme),cycle:function(d){ settings.theme=cyc(THEMES,settings.theme,d); saveSettings(); applyTheme(); rebuild(); }},
       {label:"Hide systems without games",sub:"Like RetroBat: only systems with ROMs appear",icon:ICON.all,toggle:settings.hideEmptySystems,action:function(){ settings.hideEmptySystems=!settings.hideEmptySystems; saveSettings(); renderSystems(); rebuild(); }},
       {label:"Kid mode",sub:"Hides add / delete / rename and the Settings button — press S or START to come back here",icon:ICON.star,toggle:settings.kidMode,action:function(){ settings.kidMode=!settings.kidMode; saveSettings(); document.body.classList.toggle("kid",settings.kidMode); rebuild(); }},
@@ -1460,6 +1493,7 @@
   }
   function applyTheme(){ document.body.setAttribute("data-theme",settings.theme||"carbon"); document.body.classList.toggle("kid",!!settings.kidMode); }
   applyTheme();
+  applyLanguage(false);
   byId("sysSettings").addEventListener("click",openSettings);
   byId("sysSearch").addEventListener("click",function(){ openLibrary("all"); setTimeout(function(){ byId("libSearch").focus(); },50); });
   byId("sysHelp").addEventListener("click",showHelp);
@@ -1507,6 +1541,7 @@
     var host=byId("ejsHost"); host.innerHTML="";
     var ld=byId("plLoading"); ld.style.display="flex"; ld.classList.remove("err"); setLoad("LOADING CORE…"); byId("plLoadingSys").innerHTML=sys.icon; byId("plLoadingName").textContent=game.name; byId("plLoadingSub").textContent=sys.name+" · "+coreLabel(sys);
     byId("plLoadingTip").textContent=tipFor(sys);
+    localizeUI(byId("plLoading"));
     byId("plHud").classList.remove("show");
 
     // --- ROM source: File object (kept in DB) or bundled URL. Multi-file (cue+bin) games are packed
@@ -1560,7 +1595,7 @@
     });
     return runtimeReady;
   }
-  function langFor(){ var l=(navigator.language||"en-US"); var map={en:"en-US",es:"es-ES",el:"el-GR",it:"it-IT",pt:"pt-BR",ja:"ja-JA",ru:"ru-RU",zh:"zh-CN",ar:"ar-AR",hi:"hi-HI",ko:"ko-KO",tr:"tr-TR",vi:"vi-VN",fa:"fa-AF"}; return map[l.split("-")[0]]||"en-US"; }
+  function langFor(){ if(settings.language && settings.language!=="auto") return settings.language; var l=(navigator.language||"en-US"); var map={en:"en-US",es:"es-ES",el:"el-GR",it:"it-IT",pt:"pt-BR",ja:"ja-JA",ru:"ru-RU",zh:"zh-CN",ar:"ar-AR",hi:"hi-HI",ko:"ko-KO",tr:"tr-TR",vi:"vi-VN",fa:"fa-AF"}; return map[l.split("-")[0]]||"en-US"; }
   function launchEmulator(sys,game,biosUrl){
     loadRuntime().then(function(){
       if(current!==game) return;
@@ -1616,7 +1651,7 @@
     if(sys.bios) tips.unshift("BIOS files for "+sys.short+" are managed from the BIOS button in the library.");
     return tips[Math.floor(Math.random()*tips.length)];
   }
-  function setLoad(t){ byId("plLoadingTxt").textContent=t; }
+  function setLoad(t){ byId("plLoadingTxt").textContent=T(t); }
   function loadError(msg){
     var ld=byId("plLoading"); ld.style.display="flex"; ld.classList.add("err"); ld.classList.remove("done");
     clearTimeout(watchdog);
@@ -1700,7 +1735,7 @@
     showHud("<b>"+esc(current.name)+"</b> · "+hotkeyName()+"+START or ESC to quit · CTRL+F12 control center",3800);
     try{ window.EJS_emulator.elements.parent.focus(); }catch(e){}
   }
-  function showHud(html,ms){ var h=byId("plHud"); h.innerHTML=html; h.classList.add("show"); clearTimeout(hudTimer); hudTimer=setTimeout(function(){ h.classList.remove("show"); },ms||2200); }
+  function showHud(html,ms){ var h=byId("plHud"); h.innerHTML=html; localizeUI(h); h.classList.add("show"); clearTimeout(hudTimer); hudTimer=setTimeout(function(){ h.classList.remove("show"); },ms||2200); }
 
   /* ---- state persistence (EmulatorJS-states DB, keyed per game + slot) ---- */
   function ejsStates(){ try{ return window.EJS_emulator && window.EJS_emulator.storage && window.EJS_emulator.storage.states; }catch(e){ return null; } }
@@ -2045,6 +2080,7 @@
       g.appendChild(el);
     });
     var tat=byId("ccTattoo"); tat.textContent=sys.controls||KB_STD;
+    localizeUI(byId("cc"));
   }
   function ccActivate(dir){ var it=ccItems[ccFocus]; trace("ccActivate",ccFocus,it&&it.id); if(!it)return; blip("select"); if(it.cycle){ it.cycle(dir); return; } it.action(); }
   function ccMove(d){ var n=(ccFocus+d+ccItems.length)%ccItems.length; if(n!==ccFocus) blip("move"); ccFocus=n; $$("#ccGrid .cci").forEach(function(x,k){x.classList.toggle("focus",k===ccFocus);}); }
