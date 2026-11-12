@@ -1,0 +1,145 @@
+{
+  "_comment": "Recalbox OS Web — Simplified Chinese for the bundled free library. Only overwrites the display copy; library.json stays untouched. Games you add yourself are never affected.",
+  "genres": {
+    "Action": "动作",
+    "Action adventure": "动作冒险",
+    "Adventure": "冒险",
+    "Arcade": "街机",
+    "Arcade / maze": "街机 / 迷宫",
+    "Arcade / skill": "街机 / 技巧",
+    "Arcade platformer": "街机平台",
+    "Arcade shooter": "街机射击",
+    "Arena / party": "竞技 / 派对",
+    "Controller test / utility": "手柄测试 / 工具",
+    "Demo": "演示",
+    "FPS": "第一人称射击",
+    "Maze": "迷宫",
+    "Party / brawler": "派对 / 格斗",
+    "Platformer": "平台跳跃",
+    "Puzzle": "益智",
+    "Puzzle platformer": "益智平台",
+    "Roguelike": "肉鸽",
+    "Shooter": "射击",
+    "Space shooter (first-person)": "太空射击（第一人称）",
+    "Sports": "体育",
+    "Submarine combat": "潜艇对战",
+    "Test suite / utility": "测试套件 / 工具",
+    "Utility": "工具"
+  },
+  "games": {
+    "embedded-2048": {
+      "desc": "NES 上的经典滑块益智：合并数字，一路做到 2048。"
+    },
+    "embedded-nova": {
+      "desc": "完整长度的平台跳跃：诺瓦复制敌人的能力，穿越一个奇异世界。现代 NES 同人游戏中的佳作。"
+    },
+    "embedded-alterego": {
+      "desc": "益智平台：与你的幽灵双胞胎交换位置，吃遍每一个像素。共 25 关。"
+    },
+    "embedded-spacegulls": {
+      "desc": "节奏明快的动作平台游戏，一支海鸥小队闯荡太空。NESdev 比赛获奖作品。"
+    },
+    "embedded-sbg": {
+      "desc": "《忍者龙剑传》风格的 Super Famicom 同人动作游戏，带过场动画与电影式开场。"
+    },
+    "embedded-nwarp": {
+      "desc": "最多 8 人的混战格斗（需分插）—— SNES 机能的技术展示。"
+    },
+    "embedded-kumidaiko": {
+      "desc": "最多四人的竞技场混战：挑一个动物面具，挥起你的鼓，在生存模式里击倒愤怒面具，或在对战模式中互殴。首届 N64brew Game Jam 亚军。摇杆移动，A 选择，Start 结束回合。"
+    },
+    "embedded-tobu": {
+      "desc": "街机平台：冲刺、二段跳，追上你的猫。适合速通，带计时挑战。"
+    },
+    "embedded-deadeus": {
+      "desc": "恐怖冒险：村庄只剩三天。11 个结局，使用 GB Studio 制作。"
+    },
+    "embedded-celeste": {
+      "desc": "最初的 PICO-8 版《蔚蓝》，移植到 Game Boy Advance。30 个考验精准操作的关卡。"
+    },
+    "embedded-cavestory": {
+      "desc": "经典免费游戏《洞窟物语》的 Mega Drive 完整同人移植。流程长、质量高，堪称定版。"
+    },
+    "embedded-tetris-md": {
+      "desc": "功能齐全的俄罗斯方块：多种模式、双人对战与音乐，使用 SGDK 编写。"
+    },
+    "embedded-breakegg": {
+      "desc": "带一只鸡的打砖块。简单、色彩鲜艳，非常 Mega Drive。"
+    },
+    "embedded-sms-ctl": {
+      "desc": "诊断卡带：实时显示 3/6 键手柄的每一个按键。检查手柄映射很方便。"
+    },
+    "embedded-gg-btn": {
+      "desc": "Game Gear 输入测试器 —— 按下哪个键，哪个键就亮。"
+    },
+    "embedded-sheep": {
+      "desc": "帮一只羊抓住魔术贴条，越爬越高。只有 4 KB 的街机小品。"
+    },
+    "embedded-swan": {
+      "desc": "WonderSwan Color 上的小驾驶游戏：躲开汽车，积累分数。"
+    },
+    "embedded-240p-pce": {
+      "desc": "经典的显示器校准合集：色条、网格、滚动测试、手动延迟测试、声音测试等 —— 真正的 HuCard 程序，能完整跑通 PC Engine 核心。RUN = 帮助，方向键 = 导航。"
+    },
+    "embedded-rogue": {
+      "desc": "微型肉鸽：10 个随机地牢、剑、金币与怪物，尽在 Atari Lynx。"
+    },
+    "embedded-padtest": {
+      "desc": "用 JagStudio 制作的手柄实时诊断：显示帧计数、识别到的手柄类型（标准 / Team Tap / 6D）以及所有按键与小键盘状态。不是游戏，但它是唯一能在 Virtual Jaguar WASM 核心上稳定渲染的开源 Jaguar 程序 —— 用来检查本应用的 Jaguar 输入映射正合适。"
+    },
+    "embedded-astneo": {
+      "desc": "Neo Geo Pocket Color 上的矢量风《爆破彗星》，带超空间跳跃与飞碟。"
+    },
+    "embedded-psxtest": {
+      "desc": "PlayStation 手柄与视频测试程序。多数核心无需 BIOS 即可启动 —— 适合验证 PSX 核心是否正常。"
+    },
+    "embedded-cube": {
+      "desc": "PSP SDK 的旋转方块示例：用来确认 PSP 核心、WebGL2 与多线程在这台机器上都正常。"
+    },
+    "embedded-saturn": {
+      "desc": "Yabause 自带的示例光盘镜像（cue + iso + 音轨），无需 BIOS 即可启动：显示 RetroArch 演示画面、日期时间、内存占用与弹跳的 logo。可证明 Saturn 核心、CD 挂载与多轨 cue 处理都正常。"
+    },
+    "embedded-alienar": {
+      "desc": "未发行的 Williams 硬件街机游戏（Robotron 基板）—— 一款疯狂的两人竞技场射击，作者已授权免费家用。"
+    },
+    "embedded-gridlee": {
+      "desc": "在网格里弹跳接球、躲避虫子。这款 Videa 游戏唯一存世的原型。"
+    },
+    "embedded-robby": {
+      "desc": "挖地道、救人质、躲外星人。由设计者免费放出。"
+    },
+    "embedded-circus": {
+      "desc": "让小丑在跷跷板上弹起，扎破气球。最早的彩色叠层街机热门之一。"
+    },
+    "embedded-ripcord": {
+      "desc": "从飞机跳下，躲开直升机，及时拉开伞绳，落到下方移动的目标上。Exidy 彩色叠层经典。"
+    },
+    "embedded-fireone": {
+      "desc": "双人潜艇对决：透过潜望镜扫声呐、射鱼雷，还有分屏海面。使用 MAME 的双模拟旋钮 → 已映射到方向键。"
+    },
+    "embedded-supertnk": {
+      "desc": "穿越雷场的俯视坦克战。德国街机稀有之作。"
+    },
+    "embedded-sidetrac": {
+      "desc": "开着火车绕螺旋轨道，铺设铁轨躲避追击的车头。早期 Exidy 迷宫游戏 —— 简单、快速，适合测试输入延迟。"
+    },
+    "embedded-targ": {
+      "desc": "驾驶 Wummel 穿过网格城市，在 Targ 撞你之前撞上去。"
+    },
+    "embedded-spectar": {
+      "desc": "《Targ》的续作：同样的网格，更凶的冲撞者，还有会射击的 Spectar。"
+    },
+    "embedded-starfire": {
+      "desc": "第一款座舱式街机：第一人称太空缠斗，带护盾/燃料 HUD 和著名的“Star Fire”矢量风标题。投币（5），开始（1）；方向键转向，Z 开火。"
+    },
+    "embedded-carpolo": {
+      "desc": "四辆车、一个球、两个球门。1977 年的轮式多人马球。"
+    },
+    "embedded-keen4": {
+      "desc": "经典共享软件章节：Keen 踩着弹簧杆穿越暗影之地，营救议会成员。自动进入游戏（内置 dosbox.conf）；F10 快进。"
+    },
+    "embedded-wolf3d": {
+      "desc": "逃出狼堡 —— 开创 FPS 类型的作品。共享软件第一章，共十关。自动进入游戏（内置 dosbox.conf）。"
+    }
+  }
+}

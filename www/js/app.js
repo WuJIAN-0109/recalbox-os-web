@@ -300,6 +300,17 @@
   var focus={systems:0, lib:0, cons:0, zone:"games"};
   var gameFocus=null;
 
+  /* ---- optional Simplified Chinese for the bundled free library (data/i18n/games.zh-CN.json).
+     Overrides the display copy only; library.json and user-added games are untouched. ---- */
+  var GAME_I18N={genres:{},games:{}};
+  var gameI18nReady=fetch("data/i18n/games.zh-CN.json",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){ if(j){ GAME_I18N.genres=j.genres||{}; GAME_I18N.games=j.games||{}; } }).catch(function(){});
+  var EJS_ZH_EXTRA=null;
+  fetch("data/i18n/ejs-zh.json",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){ EJS_ZH_EXTRA=j; }).catch(function(){});
+  function uiLangZh(){ try{ return !!(window.I18N && I18N.locale==="zh-CN"); }catch(e){ return false; } }
+  function genreLabel(meta){ var g=meta&&meta.genre||""; return uiLangZh()&&GAME_I18N.genres[g]?GAME_I18N.genres[g]:g; }
+  function descText(game){ var d=(game&&game.meta&&game.meta.desc)||""; var o=game&&game.embedded&&GAME_I18N.games[game.id]; return (uiLangZh()&&o&&o.desc)?o.desc:d; }
+  function playersLabel(p){ if(!p&&p!==0) return ""; var n=String(p); return uiLangZh() ? n+" 人" : n+" PLAYER"+(p>1?"S":""); }
+
   /* ================= boot ================= */
   var booted=false;
   function bootNow(){
@@ -323,7 +334,7 @@
       return Promise.all(probes).then(function(res){ lib.present={}; res.forEach(function(p){ lib.present[p[0]]=p[1]; }); return lib; });
     });
   var EMB_STATS={}; try{ EMB_STATS=JSON.parse(localStorage.getItem("rbw-embedded")||"{}")||{}; if(EMB_STATS.fav!==undefined&&!EMB_STATS["embedded-2048"]){ EMB_STATS={"embedded-2048":EMB_STATS}; } }catch(e){ EMB_STATS={}; }
-  var libReady=Promise.all([DB.all("roms"),DB.all("bios"),DB.all("shots"),coresReady.catch(function(){}),bundledReady]).then(function(r){
+  var libReady=Promise.all([DB.all("roms"),DB.all("bios"),DB.all("shots"),coresReady.catch(function(){}),bundledReady,gameI18nReady]).then(function(r){
     ROMS=(r[0]||[]).map(function(x){ x.fav=!!x.fav; x.playCount=x.playCount||0; x.playTime=x.playTime||0; return x; });
     (r[1]||[]).forEach(function(b){ BIOS[b.key]=b; });
     (r[2]||[]).forEach(function(s){ try{ SHOTS[s.id]=URL.createObjectURL(s.blob); }catch(e){} });
@@ -502,7 +513,7 @@
       el.style.setProperty("--c",gs.color);
       var art = SHOTS[game.id] ? '<img class="shot" src="'+SHOTS[game.id]+'" alt="">' : '<div class="ph">'+gs.icon+'</div>';
       el.innerHTML='<div class="box">'+art+(game.fav?'<span class="favmark">'+ICON.heart+'</span>':'')+(game.embedded?'<span class="demo">FREE</span>':'')+(function(){ var rs=romsetBadge(game,gs); return rs?'<span class="demo rs '+rs.cls+'" title="'+esc(rs.title)+'">'+rs.text+'</span>':''; })()+'</div>'+
-        '<div class="meta"><div class="t" title="'+esc(game.name)+'">'+esc(game.name)+'</div><div class="s"><span class="sys" style="--c:'+gs.color+'">'+esc(gs.short)+'</span>'+(game.lastPlayed?'<span>'+fmtAgo(game.lastPlayed)+'</span>':'<span>'+fmtBytes(game.size)+'</span>')+(game.meta&&game.meta.genre?'<span class="genre">'+esc(game.meta.genre)+'</span>':'')+'</div></div>';
+        '<div class="meta"><div class="t" title="'+esc(game.name)+'">'+esc(game.name)+'</div><div class="s"><span class="sys" style="--c:'+gs.color+'">'+esc(gs.short)+'</span>'+(game.lastPlayed?'<span>'+fmtAgo(game.lastPlayed)+'</span>':'<span>'+fmtBytes(game.size)+'</span>')+(game.meta&&game.meta.genre?'<span class="genre">'+esc(genreLabel(game.meta))+'</span>':'')+'</div></div>';
       el.addEventListener("click",function(){ focusGame(idx,false,true); blip("select"); startGame(game); });
       el.addEventListener("contextmenu",function(ev){ ev.preventDefault(); focusGame(idx,false,true); openGameMenu(game); });
       el.addEventListener("mouseenter",function(){ if(hoverOK()) focusGame(idx,false,true); });
@@ -542,8 +553,8 @@
       var gs=findSys(game.sysId);
       var m=game.meta;
       d.innerHTML='<div class="dt">'+esc(game.name)+(m?' <span class="dyear">'+(m.year||"")+'</span>':'')+'</div>'+
-        (m?'<div class="dm">'+esc(m.author||"")+(m.genre?' · '+esc(m.genre):'')+(m.players?' · '+m.players+' PLAYER'+(m.players>1?'S':''):'')+' · <span class="lic">'+esc(m.license||"")+'</span></div>':'')+
-        (m&&m.desc?'<div class="dd">'+esc(m.desc)+'</div>':'')+
+        (m?'<div class="dm">'+esc(m.author||"")+(m.genre?' · '+esc(genreLabel(m)):'')+(m.players?' · '+esc(playersLabel(m.players)):'')+' · <span class="lic">'+esc(m.license||"")+'</span></div>':'')+
+        (m&&m.desc?'<div class="dd">'+esc(descText(game))+'</div>':'')+
         '<div class="dm">'+esc(gs.name)+' · '+esc(game.fileName)+' · '+fmtBytes(game.size)+' · PLAYED <b>'+(game.playCount||0)+'</b>× · TIME <b>'+fmtDur(game.playTime)+'</b> · LAST <b>'+fmtAgo(game.lastPlayed)+'</b>'+(game.fav?' · <span class="favtxt">'+ICON.heart+' FAVORITE</span>':'')+(m?' · <i class="kbd">I</i> INFO':'')+'</div>';
     } else d.innerHTML='<div class="dt">ADD GAMES</div><div class="dm">Pick one or more ROM files — you can also drop files anywhere in this window. Files are stored inside the app, so they stay in your library.</div>';
     localizeUI(d);
@@ -1384,8 +1395,8 @@
     var gs=findSys(game.sysId), m=game.meta||{};
     var row=function(k,v){ return v?'<div class="irow"><span>'+k+'</span><b>'+v+'</b></div>':''; };
     var html='<div class="ginfo">'+(SHOTS[game.id]?'<img class="gshot" src="'+SHOTS[game.id]+'" alt="">':'')+
-      (m.desc?'<p class="gdesc">'+esc(m.desc)+'</p>':'')+
-      row("SYSTEM",esc(gs.name)+' <i>('+esc(coreLabel(gs))+' core)</i>')+row("AUTHOR",esc(m.author))+row("YEAR",m.year)+row("GENRE",esc(m.genre))+row("PLAYERS",m.players)+
+      (m.desc?'<p class="gdesc">'+esc(descText(game))+'</p>':'')+
+      row("SYSTEM",esc(gs.name)+' <i>('+esc(coreLabel(gs))+' core)</i>')+row("AUTHOR",esc(m.author))+row("YEAR",m.year)+row("GENRE",esc(genreLabel(m)))+row("PLAYERS",m.players)+
       row("LICENSE",esc(m.license))+row("FILE",esc(game.fileName)+' · '+fmtBytes(game.size)+(game.extra&&game.extra.length?' (+'+game.extra.length+' track file'+(game.extra.length>1?'s':'')+')':''))+
       row("ADDED",game.embedded?'bundled with the app':fmtAgo(game.added))+row("STATS",'played '+(game.playCount||0)+'× · '+fmtDur(game.playTime)+' · last '+fmtAgo(game.lastPlayed))+
       (m.source?row("SOURCE",'<span class="src">'+esc(m.source)+'</span>'):'')+
@@ -1628,7 +1639,7 @@
         // watchdog: if nothing happened in 90 s show an error with hints
         clearTimeout(watchdog); watchdog=setTimeout(function(){ if(current===game && byId("plLoading").style.display!=="none" && !started) loadError("THE CORE TOOK TOO LONG TO START"); },90000);
       };
-      if(lang!=="en-US"){ fetch("data/localization/"+lang+".json").then(function(r){return r.json();}).then(function(j){ config.language=lang; config.langJson=j; }).catch(function(){}).then(start); }
+      if(lang!=="en-US"){ fetch("data/localization/"+lang+".json").then(function(r){return r.json();}).then(function(j){ config.language=lang; config.langJson=(lang==="zh-CN"&&EJS_ZH_EXTRA)?Object.assign({},EJS_ZH_EXTRA,j):j; }).catch(function(){}).then(start); }
       else start();
     }).catch(function(e){ console.error(e); loadError("EMULATOR FILES COULD NOT LOAD"); });
   }

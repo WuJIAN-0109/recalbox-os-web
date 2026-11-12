@@ -464,7 +464,10 @@ The frontend ships with **English** (source) and **Simplified Chinese** (`zh-CN`
   `html[lang="zh-CN"]`. Dropping a Chinese pixel font in and naming it `PressStartCN` in
   `www/css/app.css` is enough to switch the look.
 - Game **metadata** (titles, genres, bundled descriptions from `www/roms/library.json`) stays in the
-  language the games were published in.
+  language the games were published in — except the bundled free games: their descriptions and genres
+  are translated in `www/data/i18n/games.zh-CN.json` (keyed by game id, titles/authors/licenses keep
+  their original form). `www/data/i18n/ejs-zh.json` tops up the EmulatorJS strings its own `zh-CN.json`
+  is missing (e.g. *Threads*); the two are merged at launch only for Chinese.
 
 ## 📄 Licenses
 
