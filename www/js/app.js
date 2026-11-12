@@ -81,18 +81,20 @@
   /* ================= persistent storage (IndexedDB) =================
      roms  : {id, sysId, name, fileName, size, added, lastPlayed, playCount, playTime, fav, blob(File)}
      bios  : {key: sysId+"/"+fileName, sysId, fileName, blob}
-     shots : {id: romId, blob}   — last screenshot, used as box art           */
+     shots : {id: romId, blob}   — gameplay screenshot (F8 / auto) or a picked image
+     covers: {id: romId, blob}   — retail / box cover picked by the user        */
   var DB=(function(){
     var dbp=null;
     function open(){
       if(dbp)return dbp;
       dbp=new Promise(function(res,rej){
-        var r=indexedDB.open("recalbox-web",2);
+        var r=indexedDB.open("recalbox-web",3);
         r.onupgradeneeded=function(){
           var db=r.result;
           if(!db.objectStoreNames.contains("roms")) db.createObjectStore("roms",{keyPath:"id"});
           if(!db.objectStoreNames.contains("bios")) db.createObjectStore("bios",{keyPath:"key"});
           if(!db.objectStoreNames.contains("shots")) db.createObjectStore("shots",{keyPath:"id"});
+          if(!db.objectStoreNames.contains("covers")) db.createObjectStore("covers",{keyPath:"id"});
         };
         r.onsuccess=function(){res(r.result)}; r.onerror=function(){rej(r.error)};
       });
@@ -292,7 +294,8 @@
   /* ================= state ================= */
   var ROMS=[];               // loaded from DB (blob kept in memory: File objects are cheap handles)
   var BIOS={};               // key -> record
-  var SHOTS={};              // romId -> objectURL
+  var SHOTS={};              // romId -> objectURL (gameplay screenshot)
+  var COVERS={};             // romId -> objectURL (retail / box cover)
   var view="boot";           // boot | systems | library | player
   var currentSys=null;
   var libSort=localStorage.getItem("rbw-sort")||"name";
@@ -308,8 +311,10 @@
   fetch("data/i18n/ejs-zh.json",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){ EJS_ZH_EXTRA=j; }).catch(function(){});
   function uiLangZh(){ try{ return !!(window.I18N && I18N.locale==="zh-CN"); }catch(e){ return false; } }
   function genreLabel(meta){ var g=meta&&meta.genre||""; return uiLangZh()&&GAME_I18N.genres[g]?GAME_I18N.genres[g]:g; }
-  function descText(game){ var d=(game&&game.meta&&game.meta.desc)||""; var o=game&&game.embedded&&GAME_I18N.games[game.id]; return (uiLangZh()&&o&&o.desc)?o.desc:d; }
+  function descText(game){ var m=(game&&game.meta)||{}; if(m.descCustom) return m.desc||""; var o=game&&game.embedded&&GAME_I18N.games[game.id]; return (uiLangZh()&&o&&o.desc)?o.desc:(m.desc||""); }
   function playersLabel(p){ if(!p&&p!==0) return ""; var n=String(p); return uiLangZh() ? n+" 人" : n+" PLAYER"+(p>1?"S":""); }
+  /* card/dialog artwork: the user's box cover wins, then the gameplay screenshot */
+  function artUrl(game){ return COVERS[game.id] || SHOTS[game.id] || null; }
 
   /* ================= boot ================= */
   var booted=false;
@@ -334,16 +339,19 @@
       return Promise.all(probes).then(function(res){ lib.present={}; res.forEach(function(p){ lib.present[p[0]]=p[1]; }); return lib; });
     });
   var EMB_STATS={}; try{ EMB_STATS=JSON.parse(localStorage.getItem("rbw-embedded")||"{}")||{}; if(EMB_STATS.fav!==undefined&&!EMB_STATS["embedded-2048"]){ EMB_STATS={"embedded-2048":EMB_STATS}; } }catch(e){ EMB_STATS={}; }
-  var libReady=Promise.all([DB.all("roms"),DB.all("bios"),DB.all("shots"),coresReady.catch(function(){}),bundledReady,gameI18nReady]).then(function(r){
+  var libReady=Promise.all([DB.all("roms"),DB.all("bios"),DB.all("shots"),coresReady.catch(function(){}),bundledReady,gameI18nReady,DB.all("covers")]).then(function(r){
     ROMS=(r[0]||[]).map(function(x){ x.fav=!!x.fav; x.playCount=x.playCount||0; x.playTime=x.playTime||0; return x; });
     (r[1]||[]).forEach(function(b){ BIOS[b.key]=b; });
     (r[2]||[]).forEach(function(s){ try{ SHOTS[s.id]=URL.createObjectURL(s.blob); }catch(e){} });
+    (r[6]||[]).forEach(function(c){ try{ COVERS[c.id]=URL.createObjectURL(c.blob); }catch(e){} });
     // bundled free games (never stored in the DB — they come from the app package)
     var bundled=((r[4]&&r[4].games)||[]).filter(function(g){ return findSys(g.sys) && !(g.restricted && r[4].present && r[4].present[g.file]===false); }).map(function(g){
       var st=EMB_STATS[g.id]||{};
+      var meta={author:g.author,year:g.year,license:g.license,desc:g.desc,players:g.players,genre:g.genre,source:g.source,origName:g.name};
+      if(st.desc){ meta.desc=st.desc; meta.descCustom=true; }   // description edited in the game-details dialog
       return {id:g.id,sysId:g.sys,name:st.name||g.name,fileName:g.file,url:"roms/"+g.file,embedded:true,size:g.size||0,added:0,
         playCount:st.playCount||0,playTime:st.playTime||0,lastPlayed:st.lastPlayed||0,fav:!!st.fav,
-        meta:{author:g.author,year:g.year,license:g.license,desc:g.desc,players:g.players,genre:g.genre,source:g.source,origName:g.name}};
+        meta:meta};
     });
     ROMS=bundled.concat(ROMS);
     // sizes of bundled files (HEAD, local) — shown in the library
@@ -511,7 +519,8 @@
       var el=document.createElement("div"); el.className="game"+(game.fav?" fav":"");
       el.setAttribute("data-idx",idx);
       el.style.setProperty("--c",gs.color);
-      var art = SHOTS[game.id] ? '<img class="shot" src="'+SHOTS[game.id]+'" alt="">' : '<div class="ph">'+gs.icon+'</div>';
+      var artSrc=artUrl(game);
+      var art = artSrc ? '<img class="shot" src="'+artSrc+'" alt="">' : '<div class="ph">'+gs.icon+'</div>';
       el.innerHTML='<div class="box">'+art+(game.fav?'<span class="favmark">'+ICON.heart+'</span>':'')+(game.embedded?'<span class="demo">FREE</span>':'')+(function(){ var rs=romsetBadge(game,gs); return rs?'<span class="demo rs '+rs.cls+'" title="'+esc(rs.title)+'">'+rs.text+'</span>':''; })()+'</div>'+
         '<div class="meta"><div class="t" title="'+esc(game.name)+'">'+esc(game.name)+'</div><div class="s"><span class="sys" style="--c:'+gs.color+'">'+esc(gs.short)+'</span>'+(game.lastPlayed?'<span>'+fmtAgo(game.lastPlayed)+'</span>':'<span>'+fmtBytes(game.size)+'</span>')+(game.meta&&game.meta.genre?'<span class="genre">'+esc(genreLabel(game.meta))+'</span>':'')+'</div></div>';
       el.addEventListener("click",function(){ focusGame(idx,false,true); blip("select"); startGame(game); });
@@ -552,8 +561,9 @@
     if(game){
       var gs=findSys(game.sysId);
       var m=game.meta;
-      d.innerHTML='<div class="dt">'+esc(game.name)+(m?' <span class="dyear">'+(m.year||"")+'</span>':'')+'</div>'+
-        (m?'<div class="dm">'+esc(m.author||"")+(m.genre?' · '+esc(genreLabel(m)):'')+(m.players?' · '+esc(playersLabel(m.players)):'')+' · <span class="lic">'+esc(m.license||"")+'</span></div>':'')+
+      var metaLine = m && (m.author || m.genre || m.players || m.license || m.desc);
+      d.innerHTML='<div class="dt">'+(artUrl(game)?'<img class="dcover" src="'+artUrl(game)+'" alt="">':'')+esc(game.name)+(m&&m.year?' <span class="dyear">'+m.year+'</span>':'')+'</div>'+
+        (m&&(m.author||m.genre||m.players||m.license)?'<div class="dm">'+esc(m.author||"")+(m.genre?' · '+esc(genreLabel(m)):'')+(m.players?' · '+esc(playersLabel(m.players)):'')+(m.license?' · <span class="lic">'+esc(m.license)+'</span>':'')+'</div>':'')+
         (m&&m.desc?'<div class="dd">'+esc(descText(game))+'</div>':'')+
         '<div class="dm">'+esc(gs.name)+' · '+esc(game.fileName)+' · '+fmtBytes(game.size)+' · PLAYED <b>'+(game.playCount||0)+'</b>× · TIME <b>'+fmtDur(game.playTime)+'</b> · LAST <b>'+fmtAgo(game.lastPlayed)+'</b>'+(game.fav?' · <span class="favtxt">'+ICON.heart+' FAVORITE</span>':'')+(m?' · <i class="kbd">I</i> INFO':'')+'</div>';
     } else d.innerHTML='<div class="dt">ADD GAMES</div><div class="dm">Pick one or more ROM files — you can also drop files anywhere in this window. Files are stored inside the app, so they stay in your library.</div>';
@@ -635,6 +645,10 @@
         else if(view==="library") renderIfLibrary();
         var t=findSys(targets[0]);
         toast("ADDED <b>"+added+"</b> GAME"+(added===1?"":"S")+(targets.length===1&&t?" TO <b>"+esc(t.short)+"</b>":"")+(skipped.length?" · SKIPPED "+skipped.length:""),3200); blip("select");
+        /* a single non-arcade game: offer to fill in description / cover / screenshot right away */
+        if(added===1 && lastSavedGame && !lastSavedGame.embedded && t && !t.arcade && !settings.kidMode){
+          setTimeout(function(){ if(view!=="player") editGameDetails(lastSavedGame); },450);
+        }
       }
       else if(skipped.length) toast("&#9888; FILE TYPE NOT ACCEPTED HERE: <b>"+esc(skipped[0])+"</b>",4000);
       if(needChoice.length) askSystemFor(needChoice);
@@ -950,6 +964,7 @@
     }
     if(extraFiles&&extraFiles.length){ rec.extra=extraFiles.map(function(f){return {name:f.name,blob:f};}); rec.size+=extraFiles.reduce(function(a,f){return a+f.size;},0); }
     ROMS.push(rec);
+    lastSavedGame=rec;
     return DB.put("roms",rec).catch(function(e){ console.warn("store rom failed",e); toast("&#9888; COULD NOT STORE FILE (STORAGE FULL?) — IT WILL WORK UNTIL RESTART"); });
   }
   function askSystemFor(files){
@@ -1359,6 +1374,7 @@
         {label:"Play",icon:ICON.play,color:"#7ed957",action:function(){ closeModal(); startGame(game); }},
         {label:game.fav?"Remove from favorites":"Add to favorites",icon:ICON.heart,color:"#ff5a7a",action:function(){ game.fav=!game.fav; persistRom(game); closeModal(); renderIfLibrary(); renderSystems(); toast(game.fav?"ADDED TO <b>FAVORITES</b>":"REMOVED FROM FAVORITES",1500); }},
         {label:"Game info",sub:game.meta?(game.meta.author||"")+(game.meta.year?" · "+game.meta.year:"")+" · "+(game.meta.license||""):"File details",icon:ICON.info,action:function(){ closeModal(); openGameInfo(game); }},
+        {label:"Edit details",sub:"Description, box cover and screenshot",icon:ICON.file,action:function(){ closeModal(); editGameDetails(game); }},
         {label:"Controls for "+gs.short,sub:"Show the keyboard / pad layout (tattoo)",icon:ICON.keyboard,action:function(){ closeModal(); showControls(gs); }},
         {label:"Fix this romset",sub:(game.meta&&game.meta.fixed?"rebuilt from "+game.meta.fixed.from+" · ":"")+"rebuild the zip for "+coreLabel(gs)+" from this file + the other zips of the library",icon:ICON.chip,hide:!(gs.arcade&&!game.embedded&&game.blob),action:function(){ closeModal(); fixLibraryGame(game); }},
         {label:"Rename",icon:ICON.info,hide:settings.kidMode,action:function(){ closeModal(); openPrompt("RENAME GAME",esc(game.fileName),game.name,function(n){ if(n&&n.trim()){ game.name=n.trim(); persistRom(game); renderIfLibrary(); toast("RENAMED"); } }); }},
@@ -1368,7 +1384,7 @@
       ]
     });
   }
-  function persistRom(game){ trace("persistRom",game.id); if(game.embedded){ EMB_STATS[game.id]={fav:game.fav,lastPlayed:game.lastPlayed,playCount:game.playCount,playTime:game.playTime,name:game.name}; localStorage.setItem("rbw-embedded",JSON.stringify(EMB_STATS)); return Promise.resolve(); } return DB.put("roms",game).catch(function(e){console.warn(e);}); }
+  function persistRom(game){ trace("persistRom",game.id); if(game.embedded){ EMB_STATS[game.id]={fav:game.fav,lastPlayed:game.lastPlayed,playCount:game.playCount,playTime:game.playTime,name:game.name,desc:game.meta&&game.meta.desc||undefined}; localStorage.setItem("rbw-embedded",JSON.stringify(EMB_STATS)); return Promise.resolve(); } return DB.put("roms",game).catch(function(e){console.warn(e);}); }
   function deleteGame(game){
     if(game.embedded){ toast("BUNDLED FREE GAMES CANNOT BE DELETED"); return; }
     openModal({title:"DELETE "+game.name.toUpperCase()+"?",sub:"This removes the game (and its saved states) from the library.",items:[
@@ -1387,6 +1403,7 @@
       var r=indexedDB.open("EmulatorJS-states"); r.onsuccess=function(){ try{ var db=r.result; var t=db.transaction("states","readwrite"); keys.forEach(function(k){ t.objectStore("states").delete(k); }); }catch(e){} };
     }catch(e){}
     DB.del("shots",game.id); if(SHOTS[game.id]){ URL.revokeObjectURL(SHOTS[game.id]); delete SHOTS[game.id]; }
+    DB.del("covers",game.id); if(COVERS[game.id]){ URL.revokeObjectURL(COVERS[game.id]); delete COVERS[game.id]; }
     if(!silent){ renderIfLibrary(); toast("SAVED STATES & BOX ART CLEARED"); }
   }
 
@@ -1394,7 +1411,7 @@
   function openGameInfo(game){
     var gs=findSys(game.sysId), m=game.meta||{};
     var row=function(k,v){ return v?'<div class="irow"><span>'+k+'</span><b>'+v+'</b></div>':''; };
-    var html='<div class="ginfo">'+(SHOTS[game.id]?'<img class="gshot" src="'+SHOTS[game.id]+'" alt="">':'')+
+    var html='<div class="ginfo">'+(artUrl(game)?'<img class="gshot" src="'+artUrl(game)+'" alt="">':'')+
       (m.desc?'<p class="gdesc">'+esc(descText(game))+'</p>':'')+
       row("SYSTEM",esc(gs.name)+' <i>('+esc(coreLabel(gs))+' core)</i>')+row("AUTHOR",esc(m.author))+row("YEAR",m.year)+row("GENRE",esc(genreLabel(m)))+row("PLAYERS",m.players)+
       row("LICENSE",esc(m.license))+row("FILE",esc(game.fileName)+' · '+fmtBytes(game.size)+(game.extra&&game.extra.length?' (+'+game.extra.length+' track file'+(game.extra.length>1?'s':'')+')':''))+
@@ -1405,6 +1422,7 @@
       (function(){ var rs=romsetBadge(game,gs); if(!rs) return m.romset&&m.romsetStatus&&m.romsetStatus!=="ok"?row("CHECK",'<span class="ok">game files complete · '+esc(m.needsBios||"BIOS")+' installed</span>'):""; return row("CHECK",'<span class="'+rs.cls+'">'+(rs.cls==="info"?'game files complete — needs <b>'+esc(m.needsBios)+'</b> (BIOS button of the library)':esc(m.romsetNote||m.romsetStatus)+(m.missing&&m.missing.length?' — missing: '+esc(m.missing.slice(0,8).join(", "))+(m.missing.length>8?" …":""):""))+'</span>'); })()+'</div>';
     openModal({title:game.name.toUpperCase(),sub:game.embedded?"Free game bundled with Recalbox OS Web — see LICENSE for the terms of its author.":"Game in your library",html:html,items:[
       {label:"Play",icon:ICON.play,color:"#7ed957",action:function(){ closeModal(); startGame(game); }},
+      {label:"Edit details",sub:"Description, box cover and screenshot",icon:ICON.file,action:function(){ closeModal(); editGameDetails(game); }},
       {label:game.fav?"Remove from favorites":"Add to favorites",icon:ICON.heart,color:"#ff5a7a",action:function(){ game.fav=!game.fav; persistRom(game); closeModal(); renderIfLibrary(); renderSystems(); }},
       {label:"Close",icon:ICON.close,action:closeModal}]});
   }
@@ -1767,7 +1785,96 @@
       try{ window.EJS_emulator.gameManager.loadState(new Uint8Array(data)); showHud(ICON.load+(auto?" RESUMED FROM LAST SESSION · use RESET GAME in the control center to start over":" STATE LOADED · SLOT "+slot),auto?3200:1800); }catch(e){ showHud("LOAD FAILED",1500); }
     });
   }
+  /* ================= game details: description / box cover / screenshot =================
+     The three things a scraped library needs but a ROM does not carry. Images are stored in
+     IndexedDB (covers / shots) next to the game and shown as the card / dialog artwork; a box
+     cover always wins over a screenshot. Everything edited here is local to the library. */
+  var lastSavedGame=null;
+  function pickImage(cb){
+    var inp=document.createElement("input"); inp.type="file"; inp.accept="image/png,image/jpeg,image/webp,image/gif"; inp.style.display="none";
+    document.body.appendChild(inp);
+    inp.onchange=function(){ var f=inp.files&&inp.files[0]; try{ inp.remove(); }catch(e){} if(f) cb(f); };
+    inp.click();
+  }
+  function checkImage(file){
+    if(!file) return false;
+    if(!/^image\//.test(file.type||"")){ toast("&#9888; "+T("NOT AN IMAGE")); return false; }
+    if(file.size>12*1024*1024){ toast("&#9888; "+T("IMAGE TOO LARGE (MAX 12 MB)")); return false; }
+    return true;
+  }
+  function editGameDetails(game){
+    var m=game.meta||{}, sys=findSys(game.sysId)||{name:""};
+    var cover=COVERS[game.id]||null, shot=SHOTS[game.id]||null;
+    var pend={cover:null,shot:null}, clear={cover:false,shot:false};
+    var preview={cover:cover,shot:shot};
+    function cell(kind,label,tip){
+      var url=preview[kind];
+      return '<div class="gd-cell"><div class="gd-l">'+esc(T(label))+'</div>'+
+        '<div class="gd-img" id="gd-'+kind+'">'+(url?'<img src="'+url+'" alt="">':'<span>'+esc(T("No image"))+'</span>')+'</div>'+
+        '<div class="gd-btns"><button type="button" class="gd-b" data-pick="'+kind+'">'+esc(T("Choose image…"))+'</button>'+
+        '<button type="button" class="gd-b" data-clear="'+kind+'">'+esc(T("Remove"))+'</button></div>'+
+        '<div class="gd-tip">'+esc(T(tip))+'</div></div>';
+    }
+    var html='<div class="gdet">'+
+      '<div class="gd-field"><div class="gd-l">'+esc(T("Description"))+'</div>'+
+      '<textarea id="gdDesc" class="pin gd-ta" maxlength="2000" placeholder="'+esc(T("What is this game about?"))+'">'+esc(m.desc||"")+'</textarea></div>'+
+      '<div class="gd-cols">'+cell("cover","Box cover","Shown on the game card and in Game info")+cell("shot","Screenshot","Used when the game has no box cover")+'</div>'+
+      '</div>';
+    openModal({title:"GAME DETAILS",sub:esc(game.fileName)+" · "+esc(sys.name),html:html,items:[
+      {label:"Save",icon:ICON.check,color:"#7ed957",action:function(){ save(); }},
+      {label:"Cancel",icon:ICON.close,action:closeModal}]});
+    function refresh(kind){
+      var box=byId("gd-"+kind); if(!box) return;
+      var url=preview[kind];
+      box.innerHTML = url ? '<img src="'+url+'" alt="">' : '<span>'+esc(T("No image"))+'</span>';
+    }
+    $$("#modalBody [data-pick]").forEach(function(btn){
+      btn.addEventListener("click",function(){
+        var kind=btn.getAttribute("data-pick");
+        pickImage(function(file){
+          if(!checkImage(file)) return;
+          if(preview[kind] && pend[kind]) URL.revokeObjectURL(preview[kind]);
+          pend[kind]=file; clear[kind]=false; preview[kind]=URL.createObjectURL(file); refresh(kind);
+        });
+      });
+    });
+    $$("#modalBody [data-clear]").forEach(function(btn){
+      btn.addEventListener("click",function(){
+        var kind=btn.getAttribute("data-clear");
+        pend[kind]=null; clear[kind]=true; preview[kind]=null; refresh(kind);
+      });
+    });
+    function save(){
+      var desc=(byId("gdDesc").value||"").trim();
+      game.meta=game.meta||{};
+      if(desc){ game.meta.desc=desc; game.meta.descCustom=true; } else { delete game.meta.desc; delete game.meta.descCustom; }
+      var jobs=[];
+      ["cover","shot"].forEach(function(kind){
+        var store=kind==="cover"?"covers":"shots", map=kind==="cover"?COVERS:SHOTS;
+        if(pend[kind]){
+          (function(blob){
+            jobs.push(DB.put(store,{id:game.id,blob:blob}).then(function(){
+              if(map[game.id]) URL.revokeObjectURL(map[game.id]);
+              map[game.id]=URL.createObjectURL(blob);
+            }));
+          })(pend[kind]);
+        } else if(clear[kind]){
+          jobs.push(DB.del(store,game.id).then(function(){
+            if(map[game.id]){ URL.revokeObjectURL(map[game.id]); delete map[game.id]; }
+          }));
+        }
+      });
+      Promise.all(jobs).then(function(){
+        persistRom(game);
+        closeModal();
+        renderIfLibrary(); renderSystems();
+        if(view==="library") focusGame(focus.lib,false,true);
+        toast(T("GAME DETAILS SAVED"));
+      }).catch(function(e){ console.warn(e); toast("&#9888; "+T("COULD NOT SAVE THE IMAGE")); });
+    }
+  }
   function setBoxArt(game,blob){
+    if(!blob) return;
     DB.put("shots",{id:game.id,blob:blob}).then(function(){ if(SHOTS[game.id]) URL.revokeObjectURL(SHOTS[game.id]); SHOTS[game.id]=URL.createObjectURL(blob); });
   }
   function takeShot(cb){

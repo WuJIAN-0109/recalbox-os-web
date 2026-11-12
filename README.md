@@ -104,6 +104,7 @@ Version 2.0 rebuilds the frontend around the ideas that make [RetroBat](https://
 | **Full controller & keyboard navigation** | D-pad / left stick to move, **A** open · **B** back · **X** game options · **Y** search · **START** settings · **L1/R1** switch system. Every screen shows its button hints. |
 | **Game view** | Type-to-filter, sort (A-Z / last played / date added / most played / system), grid or list view, random game, jump-to-letter, favorites on top, box art from your last screenshot, play count & play time. |
 | **Game options** | Long-press / right-click / **SPACE**: play, favorite, rename, move to another system, clear saves, delete. |
+| **Game details** | Per-game **description**, **box cover** and **screenshot** (game menu → *Edit details*, or offered right after adding a single ROM). The box cover becomes the card art, the screenshot is the fallback; both are stored locally in the app's IndexedDB. |
 | **RetroBat hotkeys in game** | F2 save · F4 load · F6/F7 slot · F8 screenshot · F9 rewind · SPACE fast-forward · P pause · F11 fullscreen · **CTRL+F12 Game Control Center** · ESC quit — and the same with **HOTKEY + button** on a gamepad (see table below). |
 | **Game Control Center** | An in-game overlay: resume, save/load with slot picker, screenshot, controls "tattoo", emulator menu, fullscreen, favorite, reset, quit. The game is paused while it's open. |
 | **Save states that stick** | 9 slots per game stored in the app, with **Auto save / load** ("resume where you left"). |
@@ -438,9 +439,9 @@ scripts/build-bios-db.js    regenerates www/data/bios-db.json from the RetroBIOS
 .github/workflows/build.yml  GitHub Actions cloud build
 ```
 
-Where things are stored on your machine (all local): games, BIOS and box art in the app's
-IndexedDB (`recalbox-web`), save states in `EmulatorJS-states`, in-game saves (SRAM / memory cards)
-in the emulator's IDBFS, settings in `localStorage`.
+Where things are stored on your machine (all local): games, BIOS, box covers and box art in the app's
+IndexedDB (`recalbox-web`: `roms` / `bios` / `shots` / `covers`), save states in `EmulatorJS-states`,
+in-game saves (SRAM / memory cards) in the emulator's IDBFS, settings in `localStorage`.
 
 ## 🌐 Interface language
 
